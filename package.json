@@ -1,0 +1,26 @@
+{
+  "name": "CorganoBot",
+  "version": "0.0.0",
+  "description": "Corgano's minecraft bot",
+  "main": "index.js",
+  "bin": {
+    "CorganoBot": "./index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/rom1504/CorganoBot.git"
+  },
+  "keywords": [
+    "mineflayer",
+    "minecraft",
+    "bot"
+  ],
+  "author": {
+    "name": "Corgano"
+  },
+  "license": "BSD",
+  "dependencies": {
+    "mineflayer": "andrewrk/mineflayer#master",
+    "mineflayer-navigate": "~0.0.9"
+  }
+}
