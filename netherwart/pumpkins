@@ -214,14 +214,14 @@ function pumpkin() {
 
           // check for grown netherwart
           if (block && block.type == 115 && (bot.lastTarget.position.x != block.position.x || bot.lastTarget.position.y != block.position.y) && block.metadata == 3) {
-            console.log("Grown netherwart at "+block.position.x+", "+block.position.y+", "+block.position.z)
+            console.log(">Grown netherwart at "+block.position.x+", "+block.position.y+", "+block.position.z)
             return digNether(block)
             //~ return setTimeout(pumpkin, 5000)
           }
 
           // check for empty soulsand
           if (block && block.type == 0 && block2 && block2.type == 88) {
-            console.log("empty soulsand at "+block.position.x+", "+block.position.y+", "+block.position.z)
+            console.log(">empty soulsand at "+block.position.x+", "+block.position.y+", "+block.position.z)
             return digNether(block)
             //~ return equiptNether(block)
           }
@@ -321,12 +321,15 @@ function pumpkin() {
               //~ return pumpkin()
               return
             } else {
-              console.log("+  digging netherwart worked!")
+              console.log("+  Netherwart already mined!")
               return setTimeout(function(){  equiptNether(block)  }, 300);
             }
           }, 200);
         });
 
+      } else if(block && block.type == 0) {
+        console.log("+  Netherwart already mined!")
+        return setTimeout(function(){  equiptNether(block)  }, 300);
       } else { // if block && bot.canDigBlock(block) is false
         console.log(block)
         console.log("!  Block error while looking for netherwart!")
@@ -370,10 +373,12 @@ function pumpkin() {
     if (newBlock.type == 115) {console.log("    Block is already netherwart? returning..."); return pumpkin() }
     if (!trynum) {trynum = 0} // used for limiting how long it waits to pick up netherwart
     if (trynum > 5) {console.log("!    placing netherwart keeps failing!"); return; return pumpkin() }
-    //~ console.log(block)
+    console.log(block)
     console.log(">  planting netherwart")
     var location = vec3( parseFloat(block.position.x, 10), parseFloat(block.position.y-1, 10), parseFloat(block.position.z, 10) );
     var reference = bot.blockAt( location )
+    console.log("reference")
+    console.log(reference)
 
     bot.placeBlock(reference, mineflayer.vec3(0, 1, 0));
     console.log("   placed block")
@@ -390,14 +395,14 @@ function pumpkin() {
             return setTimeout( function(){  replantNether(block, trynum+1)  }, 200);
           } else {
             console.log("+    planting succeeded! (second check)")
-            //~ return
+            return
             return pumpkin()
           }
         }, 200)
 
       } else {
         console.log("+    planting succeeded!")
-        //~ return
+        return
         return pumpkin()
       }
     }, 200)
