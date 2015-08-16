@@ -24,6 +24,10 @@ masters = ["djrockster", "MCorgano", "TheBuzzSaw", "MCorBit"]
 
 navigatePlugin(bot);
 bot.navigate.blocksToAvoid[132] = true; // avoid tripwire
+bot.navigate.blocksToAvoid[70] = false; // avoid redstone
+bot.navigate.blocksToAvoid[72] = false; // avoid redstone
+bot.navigate.blocksToAvoid[55] = false; // avoid redstone
+bot.navigate.blocksToAvoid[331] = false; // avoid redstone
 bot.navigate.blocksToAvoid[115] = true; // avoid netherwart
 bot.navigate.blocksToAvoid[59] = false; // ok to trample crops
 
@@ -48,19 +52,26 @@ bot.navigate.on('interrupted', function() {
 
 
 bot.on('spawn', function() {
+  console.log("Bot has spawnned!")
   setTimeout( function() {
-    bot.chat("/home");
+
+    console.log("Username == "+bot.username)
+
+    //~ bot.chat("/home");
     //~ bot.equip(0, 'hand')
     bot.unequip()
     setTimeout( function() {
       if (process.argv.length > 5){
         if (process.argv[6] == "cobble"){
-          emptyInv(Object([ '257', '270', '274', '278', '285' ]), function(){
-            equipOneOf(Object([ '257', '270', '274', '278', '285' ]), 0, function(){
-              target = bot.blockAt(bot.entity.position.offset(0, 1, 0));
-              return dig()
+          bot.chat("/home");
+          setTimeout(function() {
+            emptyInv(Object([ '257', '270', '274', '278', '285' ]), function(){
+              equipOneOf(Object([ '257', '270', '274', '278', '285' ]), 0, function(){
+                target = bot.blockAt(bot.entity.position.offset(0, 1, 0));
+                return dig()
+              });
             });
-          });
+          }, 1000)
         } else if (process.argv[6] == "tree"){
           emptyInv(Object([ '275', '6' ]), function(){
             equipOneOf(Object([ '275' ]), 0, function(){
@@ -104,7 +115,10 @@ bot.on('whisper', function(username, message) {
   if (bot.players[username]){target = bot.players[username].entity;}
   //~ console.log("Whisper: "+message)
   switch(message) {
-     case 'list':
+    case 'sweep':
+      sweep(function(){  console.log("sweep finnished"); })
+      break;
+    case 'list':
       sayItems();
       break;
     case 'empty':
@@ -132,53 +146,13 @@ bot.on('whisper', function(username, message) {
     case 'stop':
       bot.navigate.stop();
       break;
-    case 'testcb':
-      bot.chat("computing path to " + target.position);
-      var results = bot.navigate.findPathSync(target.position);
-      bot.chat("status: " + results.status);
-      bot.navigate.walk(results.path, function(stopReason) {
-        bot.chat("done. " + stopReason);
-      });
-      break;
-
-    case 's11':
-      console.log("Searching for netherwart that is grown")
-      var block = searchLane([115], null, null, [3], null, null, 0)
-      console.log(block.position)
-      break;
-    case 's12':
-      console.log("Searching for netherwart that is grown")
-      var block = searchLane([115], null, null, [3], null, null, 1)
-      console.log(block.position)
-      break;
-    case 's21':
-      console.log("Searching for empty soulsand")
-      var block = searchLane([0], null, [88], null, null, null, 0)
-      console.log(block.position)
-      break;
-    case 's22':
-      console.log("Searching for empty soulsand")
-      var block = searchLane([0], null, [88], null, null, null, 1)
-      console.log(block.position)
-      break;
-
-    case 's31':
-      console.log("Searching for netherwart that is grown")
-      var block = searchDiamond([115], null, null, [3], null, null)
-      console.log(block.position)
-      break;
-    case 's32':
-      console.log("Searching for empty soulsand")
-      var block = searchDiamond([0], null, [88], null, null, null)
-      console.log(block.position)
-      break;
 
     default:
       break;
 
   }
 
-  if (message.substring(0, 3) == "say") {
+  if (message.substring(0, 3) == "say" && message.substring(4, 8) != "/pay") {
     bot.chat(message.substring(4));
   } else {
     var match = message.match(/^goto\s*\(\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)\s*$/);
@@ -202,7 +176,7 @@ function moveMiddle(goalPosition,done){
 	bot.setControlState('forward', true);
 	var arrive=setInterval((function(goalPosition,done){return function()
 	{
-		if(goalPosition.distanceTo(bot.entity.position)<0.12 )
+		if(Math.abs(goalPosition.x-bot.entity.position.x)+Math.abs(goalPosition.z-bot.entity.position.z)<0.12 )
 		{
 			bot.setControlState('forward', false);
 			clearInterval(arrive);
@@ -211,12 +185,62 @@ function moveMiddle(goalPosition,done){
 	}})(goalPosition,done),50);
 }
 
+// Swep - looks for any items the bot sees on the same level for it an picks them up
+function sweep(callback, lastItem){
+  for (var key in bot.entities) {
+    // If twice in a row the bot tries to pick up the same item, some error happened. Full inv is most common
+    if (bot.entities[key] == lastItem){
+      console.log("Failed to pick up item! am I full?")
+      return callback("Inventory full (collected same item twice)")
+
+    } else if ( bot.entities[key].metadata && bot.entities[key].metadata['10'] && bot.entities[key].height == 0 && Math.abs(bot.entities[key].position.y - bot.entity.position.y) < 0.1 ){
+      console.log("Found one!")
+      console.log(bot.entities[key].position, bot.entities[key].metadata['10']);
+      var results = bot.navigate.findPathSync(bot.entities[key].position);
+      return bot.navigate.walk(results.path, function(stopReason) {
+        if (stopReason == "obstructed"){
+          console.log("!   Cannot get to location!");
+          //~ bot.chat("/is home");
+        }
+
+        return setTimeout(function(){ sweep(callback, bot.entities[key]) },300)
+      })
+    }
+  }
+
+  callback()
+}
+
 function tree() {
 
-  console.log("Looking for tree")
-  var block = searchTree();
-  if (!block){console.log("no trees found"); return setTimeout(tree, 5000)}
-  return start(block)
+
+  return sweep(function(){
+    var results = bot.navigate.findPathSync( vec3(2187, 142, 3735) );
+    return bot.navigate.walk(results.path, function(stopReason) {
+
+      bot.lookAt(bot.entity.position.offset(-1, 1.5, 0), true, function(){
+        emptyInv(['275','6'], function(){
+          setTimeout( function() {
+
+            equipOneOf('275', 0, function(){
+              console.log("Looking for tree")
+              var block = searchTree();
+              if (!block){
+                console.log("no trees found")
+
+                return setTimeout( function(){tree()}, 1000)
+              }
+
+              return start(block)
+
+            });
+
+          }, 200)
+        });
+      });
+
+    });
+  });
 
   function start(block){
     if (!block){console.log("! mineTree called with invalid block!"); return;}
@@ -246,7 +270,11 @@ function tree() {
         var target3 = bot.blockAt(block.position.offset(0, 2, 0))
 
         console.log("  Equipping axe")
-        equipOneOf([275], 0, function(){
+        equipOneOf([275], 0, function(err){
+          if (err){
+            console.log("Error equipping pic!")
+            return
+          }
           console.log("    Mining tree")
           bot.dig(target1, function(){
             console.log("      Done mining 1")
@@ -281,7 +309,7 @@ function tree() {
 
   function spiral(block, num){
     console.log("  spiral "+num)
-    var nextnum = 0
+    var nextnum = 0, step
     var x = 0
     var z = 0
     if (num == 0){nextnum = 1, x = 1, z = 0}
@@ -289,13 +317,36 @@ function tree() {
     if (num == 2){nextnum = 3, x = -1, z = 0}
     if (num == 3){nextnum = 0, x = 0, z = -1}
 
+    step = bot.blockAt(block.position.offset(x, 0, z))
+    if (step.type == 0){
+      console.log("need to place step!")
+      var face = mineflayer.vec3(-1, 0, 0)
+      target1 = bot.blockAt(block.position.offset(1, 0, 0))
+      if (!target1 || target1.type == 0){ target1 = bot.blockAt(step.position.offset(0, 0, 1)); face = mineflayer.vec3(0, 0, -1) }
+      if (!target1 || target1.type == 0){ target1 = bot.blockAt(step.position.offset(-1, 0, 0)); face = mineflayer.vec3(1, 0, 0) }
+      if (!target1 || target1.type == 0){ target1 = bot.blockAt(step.position.offset(0, 0, -1)); face = mineflayer.vec3(0, 0, 1) }
+      if (!target1 || target1.type == 0){ target1 = bot.blockAt(step.position.offset(0, 1, 0)); face = mineflayer.vec3(0, -1, 0) }
+
+      return equipOneOf(['17','162','163'], 0, function(){
+        bot.placeBlock(target1, face, function(){
+
+          spiral(block, num);
+
+        })
+      })
+
+    }
+
+
     var target1 = bot.blockAt(block.position.offset(x, 1, z))
     var target2 = bot.blockAt(target1.position.offset(0, 1, 0))
     var target3 = bot.blockAt(target1.position.offset(0, 2, 0))
+    var check1 = bot.blockAt(target1.position.offset(0, 3, 0))
+    var check2 = bot.blockAt(bot.entity.position.offset(0, 3, 0))
     //~ console.log("Next bottom block to mine")
     //~ console.log(target1.position)
 
-    if ((!target1 || target1.type == 0)&&(!target2 || target2.type == 0)){
+    if ((!target1 || target1.type == 0)&&(!target2 || target2.type == 0)&&(!check1 || check1.type == 0)&&(!check2 || check2.type == 0)){
 
       if (num == 0){x = 1, z = 1}
       if (num == 1){x = 0, z = 1}
@@ -312,6 +363,21 @@ function tree() {
           console.log("Moving failed, trying again")
           return spiral(block, num);
         }
+
+        var target = ""
+        for (x = -1; x < 2; x++){
+          for (y =  0; y < 2; y++){
+            for (z = -1; z < 2; z++){
+              target = bot.blockAt( bot.entity.position.offset(x, y, z) )
+              if ( target && (target.type == 17 || target.type == 18 || target.type == 161 || target.type == 162) ) {
+                console.log("    Block might be in the way of middle func, digging")
+                return bot.dig(target, function(){ spiral(block, num) })
+              }
+            }
+          }
+        }
+
+
         setTimeout(function(){
           location = vec3(location.x, bot.entity.position.y, location.z)
           moveMiddle(location, function(){
@@ -363,8 +429,15 @@ function tree() {
     console.log("Dig down "+tryNum)
     //~ console.log(location)
     //~ console.log(vec3( location.x, bot.entity.position.y -1, location.z))
-    var target = bot.blockAt( vec3( location.x, bot.entity.position.y -1, location.z) );
-    //~ console.log(target.type+"   "+target.position)
+    var target = ""
+
+    for (x = -3; x < 3; x++){
+      for (z = -3; z < 3; z++){
+        if ( !target || (target.type != 17 && target.type != 162) ) {target = bot.blockAt( vec3( location.x+x, bot.entity.position.y+1, location.z+z) ); }
+      }
+    }
+
+    if ( !target || (target.type != 17 && target.type != 162) ) {target = bot.blockAt( vec3( location.x, bot.entity.position.y -1, location.z) ); }
     if ( !target || (target.type != 17 && target.type != 18 && target.type != 161 && target.type != 162) ) {target = bot.blockAt( vec3( location.x, bot.entity.position.y -1, location.z-1) ); console.log(target.type+"   "+target.position)}
     if ( !target || (target.type != 17 && target.type != 18 && target.type != 161 && target.type != 162) ) {target = bot.blockAt( vec3( location.x-1, bot.entity.position.y -1, location.z-1) ); console.log(target.type+"   "+target.position)}
     if ( !target || (target.type != 17 && target.type != 18 && target.type != 161 && target.type != 162) ) {target = bot.blockAt( vec3( location.x-1, bot.entity.position.y -1, location.z) ); console.log(target.type+"   "+target.position)}
@@ -391,39 +464,75 @@ function tree() {
 
     if(target && bot.canDigBlock(target)) {
       //~ console.log("  starting to dig " + target.name);
-      return bot.dig(target, onDiggingCompleted);
+      return bot.dig(target, function(){  digDown(location)  });
     } else {
       console.log("    cannot dig");
     }
   }
 
-  function onDiggingCompleted() {
+  //~ function onDiggingCompleted() {
     //~ console.log("    finished digging " + target.name);
     //~ console.log("    finished digging");
-    return digDown(location)
-  }
+    //~ return digDown(location)
+  //~ }
 
   function replant(location){
-    var target1 = bot.blockAt( vec3( location.x, bot.entity.position.y -1, location.z) );
-    var target2 = bot.blockAt( vec3( location.x-1, bot.entity.position.y -1, location.z) );
-    var target3 = bot.blockAt( vec3( location.x-1, bot.entity.position.y -1, location.z-1) );
-    var target4 = bot.blockAt( vec3( location.x, bot.entity.position.y -1, location.z-1) );
-    bot.equip(bot.inventory.findInventoryItem( 6, 1), "hand", function(err) {
 
-      bot.placeBlock(target1, mineflayer.vec3(0, 1, 0), function(){
-      bot.placeBlock(target2, mineflayer.vec3(0, 1, 0), function(){
-      bot.placeBlock(target3, mineflayer.vec3(0, 1, 0), function(){
-      bot.placeBlock(target4, mineflayer.vec3(0, 1, 0), function(){
-        console.log("done placing sapplings")
-        return tree()
+    //~ console.log(bot.entities)
+    //~ console.log("Collect sapplings before replanting")
+    //~ return sweep(function(){
 
+    return sweep(function(){
+      setTimeout( function() {
 
-      });
-      });
-      });
-      });
+        var results = bot.navigate.findPathSync( vec3( location.x, bot.entity.position.y -1, location.z) );
+        return bot.navigate.walk(results.path, function(stopReason) {
 
-    })
+          var target1 = bot.blockAt( vec3( location.x, bot.entity.position.y -1, location.z) );
+          var target2 = bot.blockAt( vec3( location.x-1, bot.entity.position.y -1, location.z) );
+          var target3 = bot.blockAt( vec3( location.x-1, bot.entity.position.y -1, location.z-1) );
+          var target4 = bot.blockAt( vec3( location.x, bot.entity.position.y -1, location.z-1) );
+          //~ bot.equip(bot.inventory.findInventoryItem( 6, 1), "hand", function(err) {
+          //~ bot.equip(bot.inventory.findInventoryItem( 6, 5), "hand", function(err) {
+          bot.equip(6, "hand", function(err) {
+          bot.equip(6, "hand", function(err) {
+
+            bot.placeBlock(target1, mineflayer.vec3(0, 1, 0), function(){
+            bot.placeBlock(target2, mineflayer.vec3(0, 1, 0), function(){
+            bot.placeBlock(target3, mineflayer.vec3(0, 1, 0), function(){
+            bot.placeBlock(target4, mineflayer.vec3(0, 1, 0), function(){
+              console.log("done placing sapplings");
+
+              return sweep(function(){
+                var results = bot.navigate.findPathSync( vec3(2187, 142, 3735) );
+                return bot.navigate.walk(results.path, function(stopReason) {
+
+                  bot.lookAt(bot.entity.position.offset(-1, 1.5, 0), true, function(){
+                    emptyInv(['275','6'], function(){
+                      setTimeout( function() {
+                        equipOneOf('275', 0, function(){
+                          return setTimeout( tree(), 1000)
+                        });
+                      }, 200)
+                    });
+                  });
+
+                });
+              });
+
+            });
+            });
+            });
+            });
+
+          });
+          });
+
+        });
+
+      }, 200)
+    });
+
   }
 }
 
@@ -431,11 +540,15 @@ function tree() {
 
 
 //Tries to equipt an item from an array
-function equipOneOf(list, num, callback) {
+function equipOneOf(list, num, callback, attempt) {
+  if (!attempt){attempt=0}
   if (num == 0){
     console.log("Equipting item from list:")
     console.log(list)
 	//~ console.log(bot.inventory.items())
+  } else if (attempt && attempt > 5) {
+    num ++
+    attempt = 0
   }
 
   //~ console.log(bot.heldItem)
@@ -447,7 +560,7 @@ function equipOneOf(list, num, callback) {
       //~ console.log(parseInt(list[num])+"  "+err)
       if (err == "Error: Server rejected transaction."){
         console.log("    Error equipting "+num+", re-try in 0.200 seconds")
-        return setTimeout( function(){ equipOneOf(list, num, callback) }, 200)
+        return setTimeout( function(){ equipOneOf(list, num, callback, attempt+1) }, 200)
       } else if (list.length > num+1) {
         equipOneOf(list, num+1, callback)
       } else {
@@ -685,7 +798,7 @@ function searchTree() {
   for (dist = 0; dist < 20; dist = dist+1) {      // controls how many blocks out the diamond shape is
     for (x = -dist; x < dist+1; x = x+1) {        // go across the diamond shape, one corner to the other
       for (modz = -1; modz < 2; modz = modz +2) { // switch from top to bottom side of diamond shape
-        if (x == 0 && modz == 1){break}
+        //~ if (x == 0 && modz == 1){break}
 
         block1  = bot.blockAt(  bot.entity.position.offset( 0+x, y, 0+modz*(dist-Math.abs(x)) )  )
         block2  = bot.blockAt(  bot.entity.position.offset( 1+x, y, 0+modz*(dist-Math.abs(x)) )  )
@@ -693,7 +806,7 @@ function searchTree() {
         block4  = bot.blockAt(  bot.entity.position.offset( 0+x, y, 1+modz*(dist-Math.abs(x)) )  )
         //~ console.log(modx*x+", "+y+", "+modz*z+"    "+block.type)
 
-        if (block1 && block1 && block1 && block1 && type.indexOf(block1.type) > -1 && type.indexOf(block2.type) > -1 && type.indexOf(block3.type) > -1 && type.indexOf(block4.type) > -1){
+        if (block1 && block2 && block3 && block4 && type.indexOf(block1.type) > -1 && type.indexOf(block2.type) > -1 && type.indexOf(block3.type) > -1 && type.indexOf(block4.type) > -1){
           console.log("+    Found!   Block1: "+block1.type+":"+block1.metadata+"   Block3: "+block3.type+":"+block3.metadata)
           return block1
         }
@@ -793,7 +906,7 @@ function searchLane(type, typeAbove, typeBelow, meta, metaAbove, metaBelow, orie
 
 function dig(tryNum) {
   if (!tryNum){tryNum = 1}
-  if (tryNum > 10){console.log("Cobble ain't coming back!"), DSGsgSGSDF}
+  if (tryNum > 10){console.log("Cobble ain't coming back!"), bot.end() }
 	//~ console.log("Dig called")
   if(bot.targetDigBlock) {
     console.log("  already digging " + bot.targetDigBlock.name);
@@ -928,3 +1041,7 @@ function itemToString(item) {
     return "(nothing)";
   }
 }
+
+
+
+
