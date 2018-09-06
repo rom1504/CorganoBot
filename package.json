@@ -21,6 +21,7 @@
   "license": "BSD",
   "dependencies": {
     "mineflayer": "andrewrk/mineflayer#master",
-    "mineflayer-navigate": "~0.0.9"
+    "mineflayer-navigate": "~0.0.9",
+    "npm": "^6.4.1"
   }
 }
